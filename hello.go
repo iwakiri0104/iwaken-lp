@@ -15,89 +15,168 @@
 package main
 
 import (
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"html/template"
-	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"regexp"
+
+	cloudevents "github.com/cloudevents/sdk-go/v2"
+	cloudeventsClient "github.com/cloudevents/sdk-go/v2/client"
 )
 
-type Template struct {
-	templates *template.Template
+type Data struct {
+	Service            string
+	Revision           string
+	Project            string
+	Region             string
+	AuthenticatedEmail string
 }
 
-func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
-}
-
-func MethodOverride(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if c.Request().Method == "POST" {
-			method := c.Request().PostFormValue("_method")
-			if method == "PUT" || method == "PATCH" || method == "DELETE" {
-				c.Request().Method = method
-			}
-		}
-		return next(c)
+func handleReceivedEvent(ctx context.Context, event cloudevents.Event) {
+	type LoggedEvent struct {
+		Severity  string            `json:"severity"`
+		EventType string            `json:"eventType"`
+		Message   string            `json:"message"`
+		Event     cloudevents.Event `json:"event"`
 	}
+	type PubSubMessage struct {
+		Data string `json:"data"`
+	}
+	type PubSubEvent struct {
+		Message PubSubMessage `json:"message"`
+	}
+
+	dataMessage := event.Data()
+
+	// In case of PubSub event, decode its payload to be printed in the message as-is.
+	if event.Type() == "google.cloud.pubsub.topic.v1.messagePublished" {
+		obj := &PubSubEvent{}
+		if err := event.DataAs(obj); err != nil {
+			fmt.Printf("Unable to decode PubSub data: %s\n", err.Error())
+		}
+		decodedMessage, decodingError := base64.StdEncoding.DecodeString(obj.Message.Data)
+		if decodingError != nil {
+			fmt.Printf("Unable to decode PubSub message: %s\n", decodingError.Error())
+		} else {
+			dataMessage = decodedMessage
+		}
+	}
+
+	loggedEvent := LoggedEvent{
+		Severity:  "INFO",
+		EventType: event.Type(),
+		Message:   fmt.Sprintf("Received event of type %s. Event data: %s", event.Type(), dataMessage),
+		Event:     event, // Always log full event data
+	}
+	jsonLog, err := json.Marshal(loggedEvent)
+	if err != nil {
+		fmt.Printf("Unable to log event to JSON: %s\n", err.Error())
+	} else {
+		fmt.Printf("%s\n", jsonLog)
+	}
+}
+
+func getEventsHandler() *cloudeventsClient.EventReceiver {
+	ctx := context.Background()
+	p, err := cloudevents.NewHTTP()
+	if err != nil {
+		log.Fatalf("failed to create http listener for receiving events: %s", err.Error())
+	}
+	h, err := cloudevents.NewHTTPReceiveHandler(ctx, p, handleReceivedEvent)
+	if err != nil {
+		log.Fatalf("failed to create handler for receiving events: %s", err.Error())
+	}
+	return h
 }
 
 func main() {
+	tmpl := template.Must(template.ParseFiles("index.html"))
 
-	list, err := template.New("t").ParseGlob("views/template/*.html")
-
-	t := &Template{
-		templates: template.Must(list, err),
+	// Get project ID from metadata server
+	project := ""
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
+	req.Header.Set("Metadata-Flavor", "Google")
+	res, err := client.Do(req)
+	if err == nil {
+		defer res.Body.Close()
+		if res.StatusCode == 200 {
+			responseBody, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			project = string(responseBody)
+		}
 	}
 
-	e := echo.New()
+	// Get region from metadata server
+	region := ""
+	req, _ = http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/region", nil)
+	req.Header.Set("Metadata-Flavor", "Google")
+	res, err = client.Do(req)
+	if err == nil {
+		defer res.Body.Close()
+		if res.StatusCode == 200 {
+			responseBody, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			region = regexp.MustCompile(`projects/[^/]*/regions/`).ReplaceAllString(string(responseBody), "")
+		}
+	}
+	if region == "" {
+		// Fallback: get "zone" from metadata server (running on VM e.g. Cloud Run for Anthos)
+		req, _ = http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/instance/zone", nil)
+		req.Header.Set("Metadata-Flavor", "Google")
+		res, err = client.Do(req)
+		if err == nil {
+			defer res.Body.Close()
+			if res.StatusCode == 200 {
+				responseBody, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					log.Fatal(err)
+				}
+				region = regexp.MustCompile(`projects/[^/]*/zones/`).ReplaceAllString(string(responseBody), "")
+			}
+		}
+	}
 
-	//メソッド対応処理
-	e.Pre(MethodOverride)
-	e.Renderer = t
+	service := os.Getenv("K_SERVICE")
+	revision := os.Getenv("K_REVISION")
 
-	// Middleware
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+	data := Data{
+		Service:  service,
+		Revision: revision,
+		Project:  project,
+		Region:   region,
+	}
 
-	//自動マイグレーション
-	//models.Init()
+	eventsHandler := getEventsHandler()
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
+			// Handle cloud events.
+			eventsHandler.ServeHTTP(w, r)
+			return
+		}
+		// Default handler (hello page).
+		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
+		tmpl.Execute(w, data)
+	})
 
-	//db := models.DatabaseConnection()
-	//routerf
-	e.GET("/", Index)
-	e.GET("/liff", Liff)
-	e.GET("/detail", Detail)
+	fs := http.FileServer(http.Dir("./assets"))
+	http.Handle("/assets/", http.StripPrefix("/assets/", fs))
 
-	e.Static("/assets/css", "./views/assets/css")
-	e.Static("/assets/js", "./views/assets/js")
-	e.Static("/assets/scss", "./views/assets/scss")
-	e.Static("/assets/img", "./views/assets/img")
-	e.Static("/assets/vendor", "./views/assets/vendor")
-
-	// Determine port for HTTP service...
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = ":8080"
+		port = "8080"
 	}
-	// start server
-	e.Logger.Fatal(e.Start(port))
-}
 
-// index
-func Index(c echo.Context) error {
-
-	return c.Render(http.StatusOK, "index", nil)
-}
-
-// index
-func Detail(c echo.Context) error {
-	return c.Render(http.StatusOK, "detail", nil)
-}
-
-// index
-func Liff(c echo.Context) error {
-	return c.Render(http.StatusOK, "liff", nil)
+	log.Print("Hello from Cloud Run! The container started successfully and is listening for HTTP requests on $PORT")
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
