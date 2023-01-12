@@ -98,7 +98,7 @@ func getEventsHandler() *cloudeventsClient.EventReceiver {
 func main() {
 	tmpl := template.Must(template.ParseFiles("index.html"))
 
-	// Get project ID from metadata server
+	// Get project ID from metadata server.
 	project := ""
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
