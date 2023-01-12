@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package hello
+package main
 
 import (
 	"github.com/labstack/echo/v4"
@@ -80,7 +80,7 @@ func main() {
 	// Determine port for HTTP service...
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = ":8080"
 	}
 	// start server
 	e.Logger.Fatal(e.Start(port))
