@@ -80,7 +80,7 @@ func main() {
 	// Determine port for HTTP service...
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = ":8080"
+		port = "8080"
 	}
 	// start server
 	e.Logger.Fatal(e.Start(port))
