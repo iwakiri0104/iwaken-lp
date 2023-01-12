@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+{{define "liff"}}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LIFF</title>
+</head>
+<body>
+<!-- liffを使うためのCDN -->
+{{/*<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>*/}}
+<!--Set up a CDN to use axiofus-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.2/axios.min.js"></script>
+<h1>LIFF TEST</h1>
+
+<script>
+    //Set url
+
+    let routeUrl = "https://dev.dep.tc/taskqueue/post_test"
+
+    params = new URLSearchParams();
+    //Set data
+    params.append('dtl',"hogehoge");
+    params.append('LineUserId',"lineId1234567");
+
+    //Send data via asynchronous communication
+    window.axios.post(routeUrl,params,{
+        headers: {
+            'Content-Type': 'application/json',
+            "Access-Control-Allow-Origin": "*",
+            'Access-Control-Allow-Methods':"GET,PUT,POST,DELETE,OPTIONS",
+            'Access-Control-Allow-Headers':"Authorization,X-XSRF-TOKEN,Content-Type"
+        }})
+        .then((response) => {
+            if (response.status === 200) {
+                console.log(response.data);
+            }
+        }).catch(error => {
+        console.log(error);
+    });
+
+</script>
+</body>
+</html>
+{{end}}
