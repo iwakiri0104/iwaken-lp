@@ -168,13 +168,23 @@ func main() {
 		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
 		tmpl.Execute(w, data)
 	})
+	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
+			// Handle cloud events.
+			eventsHandler.ServeHTTP(w, r)
+			return
+		}
+		// Default handler (hello page).
+		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
+		tmpl.Execute(w, data)
+	})
 
 	fs := http.FileServer(http.Dir("./assets"))
 	http.Handle("/assets/", http.StripPrefix("/assets/", fs))
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "4550"
 	}
 
 	log.Print("Hello from Cloud Run! The container started successfully and is listening for HTTP requests on $PORT")
