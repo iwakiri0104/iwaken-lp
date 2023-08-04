@@ -24,6 +24,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -96,12 +97,18 @@ func getEventsHandler() *cloudeventsClient.EventReceiver {
 }
 
 func main() {
-	templates := map[string]*template.Template{
-		"/":      template.Must(template.ParseFiles("index.html")),
-		"/media": template.Must(template.ParseFiles("media.html")),
-		"/lp":    template.Must(template.ParseFiles("lp.html")),
-		"/cv":    template.Must(template.ParseFiles("cv.html")),
+	wd, err := os.Getwd()
+	if err != nil {
+		// handle error
 	}
+
+	templates := map[string]*template.Template{
+		"/":      template.Must(template.ParseFiles(filepath.Join(wd, "index.html"))),
+		"/media": template.Must(template.ParseFiles(filepath.Join(wd, "media.html"))),
+		"/lp":    template.Must(template.ParseFiles(filepath.Join(wd, "lp.html"))),
+		"/cv":    template.Must(template.ParseFiles(filepath.Join(wd, "cv.html"))),
+	}
+
 	// Get project ID from metadata server.
 	project := ""
 	client := &http.Client{}
