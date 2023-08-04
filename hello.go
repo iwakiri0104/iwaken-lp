@@ -97,6 +97,10 @@ func getEventsHandler() *cloudeventsClient.EventReceiver {
 
 func main() {
 	tmpl := template.Must(template.ParseFiles("index.html"))
+	testTmpl := template.Must(template.ParseFiles("test.html"))   // test.htmlをロード
+	mediaTmpl := template.Must(template.ParseFiles("media.html")) // media.htmlをロード
+	lpTmpl := template.Must(template.ParseFiles("lp.html"))       // lpl.htmlをロード
+	cvTmpl := template.Must(template.ParseFiles("cv.html"))       // lpl.htmlをロード
 
 	// Get project ID from metadata server.
 	project := ""
@@ -169,14 +173,21 @@ func main() {
 		tmpl.Execute(w, data)
 	})
 	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
-			// Handle cloud events.
-			eventsHandler.ServeHTTP(w, r)
-			return
-		}
-		// Default handler (hello page).
-		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
-		tmpl.Execute(w, data)
+		// 略...
+		testTmpl.Execute(w, data) // test.htmlを適用
+	})
+
+	http.HandleFunc("/media", func(w http.ResponseWriter, r *http.Request) {
+		// 略...
+		mediaTmpl.Execute(w, data) // test.htmlを適用
+	})
+	http.HandleFunc("/lp", func(w http.ResponseWriter, r *http.Request) {
+		// 略...
+		lpTmpl.Execute(w, data) // test.htmlを適用
+	})
+	http.HandleFunc("/cv", func(w http.ResponseWriter, r *http.Request) {
+		// 略...
+		cvTmpl.Execute(w, data) // test.htmlを適用
 	})
 
 	fs := http.FileServer(http.Dir("./assets"))
