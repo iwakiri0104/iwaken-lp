@@ -173,16 +173,36 @@ func main() {
 	})
 
 	http.HandleFunc("/media", func(w http.ResponseWriter, r *http.Request) {
-		// 略...
-		mediaTmpl.Execute(w, data) // test.htmlを適用
+		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
+			// Handle cloud events.
+			eventsHandler.ServeHTTP(w, r)
+			return
+		}
+		// Default handler (hello page).
+		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
+		mediaTmpl.Execute(w, data)
 	})
+
 	http.HandleFunc("/lp", func(w http.ResponseWriter, r *http.Request) {
-		// 略...
-		lpTmpl.Execute(w, data) // test.htmlを適用
+		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
+			// Handle cloud events.
+			eventsHandler.ServeHTTP(w, r)
+			return
+		}
+		// Default handler (hello page).
+		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
+		lpTmpl.Execute(w, data)
 	})
+
 	http.HandleFunc("/cv", func(w http.ResponseWriter, r *http.Request) {
-		// 略...
-		cvTmpl.Execute(w, data) // test.htmlを適用
+		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
+			// Handle cloud events.
+			eventsHandler.ServeHTTP(w, r)
+			return
+		}
+		// Default handler (hello page).
+		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
+		cvTmpl.Execute(w, data)
 	})
 
 	fs := http.FileServer(http.Dir("./assets"))
