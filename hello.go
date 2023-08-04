@@ -24,7 +24,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -97,17 +96,7 @@ func getEventsHandler() *cloudeventsClient.EventReceiver {
 }
 
 func main() {
-	wd, err := os.Getwd()
-	if err != nil {
-		// handle error
-	}
-
-	templates := map[string]*template.Template{
-		"/":      template.Must(template.ParseFiles(filepath.Join(wd, "index.html"))),
-		"/media": template.Must(template.ParseFiles(filepath.Join(wd, "views/template/media.html"))),
-		"/lp":    template.Must(template.ParseFiles(filepath.Join(wd, "views/template/lp.html"))),
-		"/cv":    template.Must(template.ParseFiles(filepath.Join(wd, "views/template/cv.html"))),
-	}
+	tmpl := template.Must(template.ParseFiles("index.html"))
 
 	// Get project ID from metadata server.
 	project := ""
@@ -169,20 +158,16 @@ func main() {
 	}
 
 	eventsHandler := getEventsHandler()
-
-	for endpoint, tmpl := range templates {
-		tmpl := tmpl // Create a new variable for each iteration
-		http.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
-				// Handle cloud events.
-				eventsHandler.ServeHTTP(w, r)
-				return
-			}
-			// Default handler (hello page).
-			data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
-			tmpl.Execute(w, data)
-		})
-	}
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
+			// Handle cloud events.
+			eventsHandler.ServeHTTP(w, r)
+			return
+		}
+		// Default handler (hello page).
+		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
+		tmpl.Execute(w, data)
+	})
 
 	fs := http.FileServer(http.Dir("./assets"))
 	http.Handle("/assets/", http.StripPrefix("/assets/", fs))
