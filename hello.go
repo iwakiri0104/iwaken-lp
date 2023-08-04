@@ -96,11 +96,12 @@ func getEventsHandler() *cloudeventsClient.EventReceiver {
 }
 
 func main() {
-	tmpl := template.Must(template.ParseFiles("index.html"))
-	mediaTmpl := template.Must(template.ParseFiles("media.html")) // media.htmlをロード
-	lpTmpl := template.Must(template.ParseFiles("lp.html"))       // lpl.htmlをロード
-	cvTmpl := template.Must(template.ParseFiles("cv.html"))       // lpl.htmlをロード
-
+	templates := map[string]*template.Template{
+		"/":      template.Must(template.ParseFiles("index.html")),
+		"/media": template.Must(template.ParseFiles("media.html")),
+		"/lp":    template.Must(template.ParseFiles("lp.html")),
+		"/cv":    template.Must(template.ParseFiles("cv.html")),
+	}
 	// Get project ID from metadata server.
 	project := ""
 	client := &http.Client{}
@@ -161,49 +162,20 @@ func main() {
 	}
 
 	eventsHandler := getEventsHandler()
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
-			// Handle cloud events.
-			eventsHandler.ServeHTTP(w, r)
-			return
-		}
-		// Default handler (hello page).
-		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
-		tmpl.Execute(w, data)
-	})
 
-	http.HandleFunc("/media", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
-			// Handle cloud events.
-			eventsHandler.ServeHTTP(w, r)
-			return
-		}
-		// Default handler (hello page).
-		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
-		mediaTmpl.Execute(w, data)
-	})
-
-	http.HandleFunc("/lp", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
-			// Handle cloud events.
-			eventsHandler.ServeHTTP(w, r)
-			return
-		}
-		// Default handler (hello page).
-		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
-		lpTmpl.Execute(w, data)
-	})
-
-	http.HandleFunc("/cv", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
-			// Handle cloud events.
-			eventsHandler.ServeHTTP(w, r)
-			return
-		}
-		// Default handler (hello page).
-		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
-		cvTmpl.Execute(w, data)
-	})
+	for endpoint, tmpl := range templates {
+		tmpl := tmpl // Create a new variable for each iteration
+		http.HandleFunc(endpoint, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && r.Header.Get("ce-type") != "" {
+				// Handle cloud events.
+				eventsHandler.ServeHTTP(w, r)
+				return
+			}
+			// Default handler (hello page).
+			data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
+			tmpl.Execute(w, data)
+		})
+	}
 
 	fs := http.FileServer(http.Dir("./assets"))
 	http.Handle("/assets/", http.StripPrefix("/assets/", fs))
