@@ -104,9 +104,9 @@ func main() {
 
 	templates := map[string]*template.Template{
 		"/":      template.Must(template.ParseFiles(filepath.Join(wd, "index.html"))),
-		"/media": template.Must(template.ParseFiles(filepath.Join(wd, "media.html"))),
-		"/lp":    template.Must(template.ParseFiles(filepath.Join(wd, "lp.html"))),
-		"/cv":    template.Must(template.ParseFiles(filepath.Join(wd, "cv.html"))),
+		"/media": template.Must(template.ParseFiles(filepath.Join(wd, "views/template/media.html"))),
+		"/lp":    template.Must(template.ParseFiles(filepath.Join(wd, "views/template/lp.html"))),
+		"/cv":    template.Must(template.ParseFiles(filepath.Join(wd, "views/template/cv.html"))),
 	}
 
 	// Get project ID from metadata server.
