@@ -97,7 +97,6 @@ func getEventsHandler() *cloudeventsClient.EventReceiver {
 
 func main() {
 	tmpl := template.Must(template.ParseFiles("index.html"))
-	testTmpl := template.Must(template.ParseFiles("test.html"))   // test.htmlをロード
 	mediaTmpl := template.Must(template.ParseFiles("media.html")) // media.htmlをロード
 	lpTmpl := template.Must(template.ParseFiles("lp.html"))       // lpl.htmlをロード
 	cvTmpl := template.Must(template.ParseFiles("cv.html"))       // lpl.htmlをロード
@@ -171,10 +170,6 @@ func main() {
 		// Default handler (hello page).
 		data.AuthenticatedEmail = r.Header.Get("X-Goog-Authenticated-User-Email") // set when behind IAP
 		tmpl.Execute(w, data)
-	})
-	http.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
-		// 略...
-		testTmpl.Execute(w, data) // test.htmlを適用
 	})
 
 	http.HandleFunc("/media", func(w http.ResponseWriter, r *http.Request) {
