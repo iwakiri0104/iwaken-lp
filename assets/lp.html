@@ -34,7 +34,17 @@
 
 <h1>テストLP</h1>
 <a href="/assets/cv.html">商品を購入する</a>
-<script src="https://dev.dep.tc/public/js/lpcv_direct_dev.js" async></script>
+
+<script>
+    if (!window.dtlpcvLpConf) {
+        window.dtlpcvLpConf = [];
+    }
+    window.dtlpcvLpConf.push({
+        siteId: "4882210586886144"
+    });
+</script>
+<script src="https://stg.dep.tc/public/js/lpcv_stg.js?cid=4882210586886144&pid=4873891000352768" async></script>
+
 </body>
 
 </html>
